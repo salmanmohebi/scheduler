@@ -1,24 +1,26 @@
+import time
 import numpy as np
-import tensorflow as tf
 from math import gcd
 from functools import reduce
 
 
 print('Start...')
-Tin = 20
+
+Tin = 4 #20
 epsilon = 0
 
-Dqos = 50
+Dqos = 5#50
 p = 0.8
-Tbi = 103
+Tbi = 20# 103
 
-B = [1, 2, 4, 6]
-TBHI = [5, 10, 20, 30]
-TABP = list(range(1, 50))
+B_list = [1, 2, 4, 6]
+Tbhi_list = [5, 10, 20, 30]
+Tabp_list = list(range(1, 50))
 
-b = B[0]
-Tbhi = TBHI[0]
-Tabp = TABP[0]
+
+b = B_list[0]
+Tbhi = Tbhi_list[0]
+Tabp = Tabp_list[0]
 
 N = (Tbi - Tbhi) // Tabp + 1
 
@@ -35,26 +37,23 @@ tau = get_gcd([Tin, Tn, Tnl])
 
 tin = Tin//tau
 tn = Tn//tau
+
 d = (Dqos - epsilon) // tau
-
-
-# a = (h + tn - tin - d) // tin + 1
 
 H = list(range(-tin, d))
 
-M = list(range(4))
+M = list(range(1, 5))
 Pj = [0, 0, 0, 1]
 
 N1 = list(range(N))
 
-A = np.zeros((len(H), len(M), len(N1), len(H), len(M), len(N1)))
-# print(A.shape)
-# A[:, 3, :] = 1
-# print(A.shape)
+l = len(H) * len(M) * N
+A = C = np.zeros((len(H), len(M), len(N1), len(H), len(M), len(N1)))
 
+# Calculating the transition matrix
 for h in H:
-    for m in range(len(M)):
-        for n in N1:
+    for m in range(4):
+        for n in range(N):
             if h < 0:
                 A[h, m, n, h, m, n] = 1
             else:
@@ -62,23 +61,33 @@ for h in H:
                 if m > 1:
                     A[h, m, n, h, m-1, n] = p
                 else:
-                    for j in M:
-                        # TODO: remember the index of m started from zero
+                    for j in range(4):
                         A[h, m, n, h-tin, j, n] = p*Pj[j]
+            # calculate the C matrix
+            if h + tn < d:
+                C[h, m, n, h+tn, m, (n+1) % N] = 1
+            else:
+                for j in range(4):
+                    ahn = (h+tn-tin-d)//tin+1
+                    A[h, m, n, h+tn-tin-ahn*tin, j, (n+1) % N] = Pj[j]
 
-
-
+A = np.reshape(A, (l, l))
+B = np.linalg.matrix_power(A, b)
+C = np.reshape(C, (l, l))
+tt = time.time()
 print('Im here, before the multiply')
-# KK = tf.linalg.matmul(A, A)
-print('The things over now..;')
-# print(type(KK))
-# a12 = 1
+P = np.dot(B, C)
+print(f'it took {time.time() - tt} to mul matrix')
 
-mm = np.random.randint(1, 10, size=(4, 5, 3))
-rr = tf.linalg.matmul(mm, mm)
+# calculate the stationary distribution
+evals, evecs = np.linalg.eig(P.T)
+evec1 = evecs[:, np.isclose(evals, 1)]
+evec1 = evec1[:, 0]
+stationary = evec1 / evec1.sum()
+stationary = stationary.real
 
-print(f'Im done, here you are: {rr}')
 
-
+ahn = (h+tn-tin-d)//(tn)+1
+PRL = ((N*tin)/(4*tn*N))*sum
 
 

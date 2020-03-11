@@ -32,10 +32,9 @@ class Packets:
             self.queue.append(Packet(self.number, self.time))
             self.number += 1
             self.time += self.period
-            # print(self.queue[-1])
             # print(f'TIME: {TIME} : {[(p.number, p.time) for p in self.queue]} | the {(self.queue[0].number, self.queue[0].time)} sent')
             # print(f' In {TIME}, packet {self.queue[0].number} that was generated in {self.queue[0].time} sent')
-        return self.queue #if len(self.queue) > 0 else None
+        return self.queue
 
 
 if __name__ == '__main__':
@@ -43,7 +42,7 @@ if __name__ == '__main__':
     allocation_period = 12
     allocation_duration = 6
     delay_bound = 10
-    packet = Packets(10)
+    packet = Packets(period=10)
     while TIME < 10000:
         # print(TIME, packet.time, len(packet.queue))
         queue = next(packet)
@@ -55,7 +54,8 @@ if __name__ == '__main__':
             d = q.age
             print(f' ->In {TIME}, packet {q.number} that was generated in {q.time} dropped')
             total_drops += q.size
-            # allocation_period -= 1
+            if allocation_period > 2:
+                allocation_period -= 1
 
         # Sent the packets
         d = allocation_duration
@@ -71,7 +71,8 @@ if __name__ == '__main__':
                 if len(queue) == 0 and d > 0:
                     print(f'{d} amount of channel wasted!!!')
                     total_waste += d
-                    # allocation_duration -= 1
+                    # if allocation_duration > 2:
+                    #     allocation_duration -= 1
                     break
 
         TIME += allocation_period
