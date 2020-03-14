@@ -18,8 +18,10 @@ class ServicePeriodAllocationV0(Env):
         self.channel_bandwidth = None
         self.channel_bit_loss_rate = None
 
+        self.cbr = ConstantBitRateTraffic()
+
     def reset(self):
-        pass
+        self.cbr.update_queue(0)
 
     def seed(self, seed=0):
         pass
@@ -57,7 +59,7 @@ class ConstantBitRateTraffic:
         self.last_packet_time = self.first_packet_time
         self.queue = list()
         self.dropped_packets_overflow = 0
-        self.dropped_packets_outdate = 0
+        self.dropped_packets_outdated = 0
         self.wasted_bandwidth = 0
 
     def generate_new_packets(self, time):
@@ -74,7 +76,7 @@ class ConstantBitRateTraffic:
     def delete_outdated_packets(self, time):
         old_queue_size = len(self.queue)
         self.queue = [p for p in self.queue if p.age(time) <= self.delay_bound]
-        self.dropped_packets_outdate += old_queue_size - len(self.queue)
+        self.dropped_packets_outdated += old_queue_size - len(self.queue)
         print(f' #{old_queue_size - len(self.queue)} outdated packets dropped')
 
     def update_queue(self, time):
