@@ -56,41 +56,42 @@ class ConstantBitRateTraffic:
         self.first_packet_time = first_packet_time
         self.last_packet_time = self.first_packet_time
         self.queue = list()
+        self.dropped_packets_overflow = 0
+        self.dropped_packets_outdate = 0
+        self.wasted_bandwidth = 0
 
     def generate_new_packets(self, time):
-        for p in range(np.random.randint(1, self.maximum_generated_packet)):
+        number_of_packets = np.random.randint(1, self.maximum_generated_packet)
+        for i, p in enumerate(range(number_of_packets)):
             if len(self.queue) < self.maximum_queue_length:
                 self.queue.append(Packet(time))
                 print(f'New packet added to queue, at {time}, the length of queue is: {len(self.queue)}')
             else:
-                print(f'Queue overflowed at {time}  should do some thing')
-                # TODO: Record the number of dropped packets to punish the agent
+                self.dropped_packets_overflow += number_of_packets - i
+                print(f'Queue overflowed at {time}  and {number_of_packets - i} packets dropped')
+                break
 
     def delete_outdated_packets(self, time):
         old_queue_size = len(self.queue)
         self.queue = [p for p in self.queue if p.age(time) <= self.delay_bound]
+        self.dropped_packets_outdate += old_queue_size - len(self.queue)
         print(f' #{old_queue_size - len(self.queue)} outdated packets dropped')
-        # TODO: Record the number of dropped packets to punish the agent
 
     def update_queue(self, time):
         for t in range(self.last_packet_time, time, self.packet_generation_period):
             self.delete_outdated_packets(t)
             self.generate_new_packets(t)
-            self.delete_outdated_packets(t)
             self.last_packet_time = t
         self.last_packet_time += self.packet_generation_period
 
     def transmit_traffic(self, duration, bandwidth, bit_error_rate=None):
-        # TODO: don't delete unsent data, send data with probability of 1-bit_error_rate
+        # TODO: Send data with probability of 1-bit_error_rate
         data_transmission_rate = bandwidth//duration
         for packet in self.queue:
             if packet.size > data_transmission_rate:
                 break
             self.queue.remove(packet)
             data_transmission_rate -= packet.size
+        # TODO: Calculate wasted_bandwidth based on packet size
+        self.wasted_bandwidth += data_transmission_rate
         print(f'{data_transmission_rate} of channel wasted!')
-
-
-
-
-
