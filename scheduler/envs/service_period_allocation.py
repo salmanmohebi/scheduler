@@ -15,12 +15,6 @@ class ServicePeriodAllocationV0(Env):
         self.allocation_duration = None
         self.dti_duration = None
 
-        self.delay_bound = None
-        self.maximum_packet_size = None
-        self.max_queue_length = None
-        self.data_generation_rate = None  # Not useful??
-        self.data_generation_period = None
-
         self.channel_bandwidth = None
         self.channel_bit_loss_rate = None
 
@@ -40,7 +34,7 @@ class ServicePeriodAllocationV0(Env):
 class Packet:
     def __init__(self, time):
         self.generated_time = time
-        self.packet_size = 256
+        self.size = 256
 
     def age(self, time):
         return time - self.generated_time
@@ -82,6 +76,22 @@ class ConstantBitRateTraffic:
         # TODO: Record the number of dropped packets to punish the agent
 
     def update_queue(self, time):
+        # TODO: Use delete_outdated_packet function inside the generate_new_packet, not like this
         self.delete_outdated_packets(time)
         self.generate_new_packets(time)
         self.delete_outdated_packets(time)
+
+    def transmit_traffic(self, duration, bandwidth, bit_error_rate=None):
+        # TODO: don't delete unsent data, send data with probability of 1-bit_error_rate
+        data_transmission_rate = bandwidth//duration
+        for packet in self.queue:
+            if packet.size > data_transmission_rate:
+                break
+            self.queue.remove(packet)
+            data_transmission_rate -= packet.size
+        print(f'{data_transmission_rate} of channel wasted!')
+
+
+
+
+
