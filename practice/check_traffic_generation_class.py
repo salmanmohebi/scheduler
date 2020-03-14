@@ -10,6 +10,6 @@ cbr = ConstantBitRateTraffic(
 )
 for tt in range(0, 50, 5):
     print(f'The time is now: {tt}')
-    cbr.drop_outdated_packets(tt)
-    cbr.generate_data(tt)
-    cbr.drop_outdated_packets(tt)
+    cbr.delete_outdated_packets(tt)
+    cbr.generate_new_packets(tt)
+    cbr.delete_outdated_packets(tt)

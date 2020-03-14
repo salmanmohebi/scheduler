@@ -63,7 +63,7 @@ class ConstantBitRateTraffic:
         self.last_packet_time = self.first_packet_time
         self.queue = list()
 
-    def generate_data(self, time):
+    def generate_new_packets(self, time):
         for t in range(self.last_packet_time, time, self.packet_generation_period):
             self.last_packet_time = t
             for p in range(np.random.randint(1, self.maximum_generated_packet)):
