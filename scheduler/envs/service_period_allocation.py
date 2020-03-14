@@ -80,3 +80,8 @@ class ConstantBitRateTraffic:
         self.queue = [p for p in self.queue if p.age(time) <= self.delay_bound]
         print(f' #{old_queue_size - len(self.queue)} outdated packets dropped')
         # TODO: Record the number of dropped packets to punish the agent
+
+    def update_queue(self, time):
+        self.delete_outdated_packets(time)
+        self.generate_new_packets(time)
+        self.delete_outdated_packets(time)
