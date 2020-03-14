@@ -58,16 +58,13 @@ class ConstantBitRateTraffic:
         self.queue = list()
 
     def generate_new_packets(self, time):
-        for t in range(self.last_packet_time, time, self.packet_generation_period):
-            self.last_packet_time = t
-            for p in range(np.random.randint(1, self.maximum_generated_packet)):
-                if len(self.queue) < self.maximum_queue_length:
-                    self.queue.append(Packet(t))
-                    print(f'New packet added to queue, at {t}, the length of queue is: {len(self.queue)}')
-                else:
-                    print(f'Queue overflowed at {t}  should do some thing')
-                    # TODO: Record the number of dropped packets to punish the agent
-        self.last_packet_time += self.packet_generation_period
+        for p in range(np.random.randint(1, self.maximum_generated_packet)):
+            if len(self.queue) < self.maximum_queue_length:
+                self.queue.append(Packet(time))
+                print(f'New packet added to queue, at {time}, the length of queue is: {len(self.queue)}')
+            else:
+                print(f'Queue overflowed at {time}  should do some thing')
+                # TODO: Record the number of dropped packets to punish the agent
 
     def delete_outdated_packets(self, time):
         old_queue_size = len(self.queue)
@@ -76,10 +73,12 @@ class ConstantBitRateTraffic:
         # TODO: Record the number of dropped packets to punish the agent
 
     def update_queue(self, time):
-        # TODO: Use delete_outdated_packet function inside the generate_new_packet, not like this
-        self.delete_outdated_packets(time)
-        self.generate_new_packets(time)
-        self.delete_outdated_packets(time)
+        for t in range(self.last_packet_time, time, self.packet_generation_period):
+            self.delete_outdated_packets(t)
+            self.generate_new_packets(t)
+            self.delete_outdated_packets(t)
+            self.last_packet_time = t
+        self.last_packet_time += self.packet_generation_period
 
     def transmit_traffic(self, duration, bandwidth, bit_error_rate=None):
         # TODO: don't delete unsent data, send data with probability of 1-bit_error_rate
