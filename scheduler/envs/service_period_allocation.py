@@ -18,6 +18,7 @@ class ServicePeriodAllocationV0(Env):
         self.channel_bandwidth = channel_bandwidth
         self.channel_bit_loss_rate = channel_bit_loss_rate
         self.traffic = None
+        self.time = 0
         self.t_max = t_max
         self.t = 0
 
@@ -28,7 +29,7 @@ class ServicePeriodAllocationV0(Env):
         self.allocation_period = np.random.randint(
             self.allocation_duration, self.dti_duration - self.allocation_duration
         )
-        self._update_state()
+        self._update_state(0)
         self.t = 0
 
     def seed(self, seed=0):
@@ -54,7 +55,9 @@ class ServicePeriodAllocationV0(Env):
             self.traffic.transmit_traffic(
                 self.allocation_duration, self.channel_bandwidth, self.channel_bit_loss_rate
             )
-        return self._update_state(), self._calculate_reward(), self.t >= self.t_max, {}
+        self.time += self.dti_duration
+        self.t += 1
+        return self._update_state(self.time), self._calculate_reward(), self.t >= self.t_max, {}
 
     def render(self, mode='human', close=False):
         pass
@@ -65,13 +68,11 @@ class ServicePeriodAllocationV0(Env):
         wb = self.traffic.wasted_bandwidth
         return -od - of - wb
 
-    def _update_state(self):
-        # TODO: State space is too complicated just one number for the q length, and the age of oldest packet??
-        self.state = np.concatenate((
-            self.traffic,
-            self.allocation_duration,
-            self.allocation_period
-        ))
+    def _update_state(self, time):
+        # state space is the age of oldest packet and the q size
+        buffer_size = len(self.traffic.queue)
+        oldest_packet = self.traffic.queue[0].age(time) if buffer_size > 0 else 0
+        self.state = np.array([buffer_size, oldest_packet])
 
 
 class Packet:
