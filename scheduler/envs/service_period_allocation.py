@@ -36,6 +36,12 @@ class ServicePeriodAllocationV0(Env):
     def render(self, mode='human', close=False):
         pass
 
+    def _calculate_reward(self):
+        od = self.cbr.dropped_packets_overflow
+        of = self.cbr.dropped_packets_outdated
+        wb = self.cbr.wasted_bandwidth
+        return -od - of - wb
+
 
 class Packet:
     def __init__(self, time):
@@ -98,6 +104,6 @@ class ConstantBitRateTraffic:
                 break
             self.queue.remove(packet)
             data_transmission_rate -= packet.size
-        # TODO: Calculate wasted_bandwidth based on packet size
-        self.wasted_bandwidth += data_transmission_rate
+        # TODO: don't hardcoded 256
+        self.wasted_bandwidth += data_transmission_rate/256
         print(f'{data_transmission_rate} of channel wasted!')
