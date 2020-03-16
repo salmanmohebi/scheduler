@@ -1,5 +1,5 @@
 import numpy as np
-from gym import spaces, Env
+from gym import Env
 
 
 TIME = None
@@ -10,18 +10,22 @@ class ServicePeriodAllocationV0(Env):
         'render.modes': ['human', 'rgb_array']
     }
 
-    def __init__(self):
+    def __init__(self, dti_duration, channel_bandwidth, channel_bit_loss_rate):
+        self.dti_duration = dti_duration
         self.allocation_period = None
         self.allocation_duration = None
-        self.dti_duration = None
 
-        self.channel_bandwidth = None
-        self.channel_bit_loss_rate = None
-
-        self.cbr = ConstantBitRateTraffic()
+        self.channel_bandwidth = channel_bandwidth
+        self.channel_bit_loss_rate = channel_bit_loss_rate
+        self.cbr = None
 
     def reset(self):
+        self.cbr = ConstantBitRateTraffic()
         self.cbr.update_queue(0)
+        self.allocation_duration = np.random.randint(1, self.dti_duration//5)
+        self.allocation_period = np.random.randint(
+            self.allocation_duration, self.dti_duration - self.allocation_duration
+        )
 
     def seed(self, seed=0):
         pass
