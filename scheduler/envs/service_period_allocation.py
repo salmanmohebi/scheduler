@@ -66,7 +66,7 @@ class ServicePeriodAllocationV0(Env):
         return -od - of - wb
 
     def _update_state(self):
-        # TODO: State space is too complicated just one number for the q length, and delay-bound
+        # TODO: State space is too complicated just one number for the q length, and the age of oldest packet??
         self.state = np.concatenate((
             self.traffic,
             self.allocation_duration,
