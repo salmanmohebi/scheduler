@@ -10,37 +10,68 @@ class ServicePeriodAllocationV0(Env):
         'render.modes': ['human', 'rgb_array']
     }
 
-    def __init__(self, dti_duration, channel_bandwidth, channel_bit_loss_rate):
+    def __init__(self, dti_duration, channel_bandwidth, channel_bit_loss_rate, t_max=1000):
         self.dti_duration = dti_duration
         self.allocation_period = None
         self.allocation_duration = None
 
         self.channel_bandwidth = channel_bandwidth
         self.channel_bit_loss_rate = channel_bit_loss_rate
-        self.cbr = None
+        self.traffic = None
+        self.t_max = t_max
+        self.t = 0
 
     def reset(self):
-        self.cbr = ConstantBitRateTraffic()
-        self.cbr.update_queue(0)
+        self.traffic = ConstantBitRateTraffic()
+        self.traffic.update_queue(0)
         self.allocation_duration = np.random.randint(1, self.dti_duration//5)
         self.allocation_period = np.random.randint(
             self.allocation_duration, self.dti_duration - self.allocation_duration
         )
+        self._update_state()
+        self.t = 0
 
     def seed(self, seed=0):
         pass
 
     def step(self, action):
-        pass
+        # TODO: check the overlap between allocations
+        if action == 1:
+            self.allocation_duration -= self.allocation_duration // 10
+            self.allocation_period -= self.allocation_period // 10
+        elif action == 2:
+            self.allocation_duration += self.allocation_duration // 10
+            self.allocation_period -= self.allocation_period // 10
+        elif action == 3:
+            self.allocation_duration -= self.allocation_duration // 10
+            self.allocation_period += self.allocation_period // 10
+        elif action == 4:
+            self.allocation_duration += self.allocation_duration // 10
+            self.allocation_period += self.allocation_period // 10
+
+        for t in range(0, self.dti_duration, self.allocation_period):
+            self.traffic.update_queue(t)
+            self.traffic.transmit_traffic(
+                self.allocation_duration, self.channel_bandwidth, self.channel_bit_loss_rate
+            )
+        return self._update_state(), self._calculate_reward(), self.t >= self.t_max, {}
 
     def render(self, mode='human', close=False):
         pass
 
     def _calculate_reward(self):
-        od = self.cbr.dropped_packets_overflow
-        of = self.cbr.dropped_packets_outdated
-        wb = self.cbr.wasted_bandwidth
+        od = self.traffic.dropped_packets_overflow
+        of = self.traffic.dropped_packets_outdated
+        wb = self.traffic.wasted_bandwidth
         return -od - of - wb
+
+    def _update_state(self):
+        # TODO: State space is too complicated just one number for the q length, and delay-bound
+        self.state = np.concatenate((
+            self.traffic,
+            self.allocation_duration,
+            self.allocation_period
+        ))
 
 
 class Packet:
