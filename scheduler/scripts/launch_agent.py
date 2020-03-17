@@ -4,7 +4,7 @@ import numpy as np
 from scheduler.agents.simple_agent import SimpleAgent
 
 n_eps = 1
-t_max = 2000
+t_max = 2
 epsilon = 0.9
 alpha = 0.9
 gamma = 0.9
@@ -12,7 +12,7 @@ gamma = 0.9
 for ep in range(n_eps):  # Run episodes
     env = gym.make(
         'ServicePeriodAllocation-v0',
-        dti_duration=1000, channel_bandwidth=5000000, channel_bit_loss_rate=None
+        dti_duration=100
     )
 
     # agent = SimpleAgent(env)
