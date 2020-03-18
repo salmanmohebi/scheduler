@@ -6,9 +6,6 @@ TIME = None
 
 
 class ServicePeriodAllocationV0(Env):
-    metadata = {
-        'render.modes': ['human', 'rgb_array']
-    }
 
     def __init__(self, dti_duration, channel_bandwidth=None, channel_bit_loss_rate=None, t_max=1000):
         self.dti_duration = dti_duration
@@ -26,11 +23,10 @@ class ServicePeriodAllocationV0(Env):
         self.packet_generation_period = 10
         self.number_of_packets = 4
         self.maximum_queue_length = 100
-        self.delay_bound = 10
+        self.delay_bound = 50
         self.first_packet_time = 0
         self.packet_size = 256
 
-        # self.actions_number = 4
         self.states_number = self.maximum_queue_length*self.delay_bound
         self.action_space = spaces.Discrete(4)
 
@@ -44,12 +40,12 @@ class ServicePeriodAllocationV0(Env):
             self.packet_size
         )
         self.traffic.update_queue(0)
-        self.allocation_duration = np.random.randint(1, self.dti_duration//5)
+        self.allocation_duration = np.random.randint(1, self.dti_duration//2)
         self.allocation_period = np.random.randint(
             self.allocation_duration, self.dti_duration - self.allocation_duration
         )
         self._update_state(0)
-        self.t = 0
+        return self.state
 
     def seed(self, seed=0):
         pass
@@ -57,7 +53,9 @@ class ServicePeriodAllocationV0(Env):
     def step(self, action):
         # TODO: check the overlap between allocations
         # TODO: Too dirty, rewrite it
-        # print(f'allocation_duration: {self.allocation_duration}, allocation_preiod: {self.allocation_period}')
+        self.traffic.dropped_packets_ = 0
+        self.traffic.dropped_packets_ = 0
+        self.traffic.wasted_bandwidth = 0
         if action == 0:
             self.allocation_duration = max(1, self.allocation_duration - np.math.ceil(self.allocation_duration / 10))
             self.allocation_period = max(self.allocation_duration, self.allocation_period - np.math.ceil(self.allocation_period / 10))
@@ -73,29 +71,35 @@ class ServicePeriodAllocationV0(Env):
 
         for t in range(self.time, self.time + self.dti_duration, self.allocation_period):
             self.traffic.update_queue(t)
-            self.traffic.transmit_traffic(self.allocation_duration)
+            self.traffic.transmit_traffic(self.allocation_duration, t)
         self.time += self.dti_duration
         self.t += 1
-        return self._update_state(self.time), self._calculate_reward(), self.t >= self.t_max, {}
+        reward = self._calculate_reward()
+        self._update_state(self.time)
+        print(f' = {reward} (reward), allocation_duration: {self.allocation_duration}, allocation_preiod: {self.allocation_period}')
+        return self.state, reward, self.t >= self.t_max, {}
 
-    def render(self, mode='human', close=False):
+    def render(self, mode='', close=False):
         pass
 
     def _calculate_reward(self):
         od = self.traffic.dropped_packets_overflow
         of = self.traffic.dropped_packets_outdated
         wb = self.traffic.wasted_bandwidth
-        self.traffic.dropped_packets_ = 0
-        self.traffic.dropped_packets_ = 0
-        self.traffic.wasted_bandwidth = 0
-        # print(f'dropped_packets_overflow: {of}, dropped_packets_outdated: {od}, wasted_bandwidth: {wb}')
+        print(f' - ({of} + {od} + {wb})', end="")
+        # self.traffic.dropped_packets_ = 0
+        # self.traffic.dropped_packets_ = 0
+        # self.traffic.wasted_bandwidth = 0
         return -od - of - wb
 
     def _update_state(self, time):
         # state space is the age of oldest packet and the q size
         buffer_size = len(self.traffic.queue)
         oldest_packet = self.traffic.queue[0].age(time) if buffer_size > 0 else 0
-        self.state = np.array([buffer_size, oldest_packet])
+        # self.state = np.array([buffer_size, oldest_packet])
+        # print(f'---{buffer_size} - {oldest_packet}')
+        self.state = buffer_size * self.delay_bound + oldest_packet - 1 if buffer_size > 0 and oldest_packet > 0 else 0
+        return self.state
 
 
 class Packet:
@@ -156,14 +160,16 @@ class ConstantBitRateTraffic:
             self.generate_new_packets(t)
             self.last_packet_time = t
 
-    def transmit_traffic(self, duration, bandwidth=256, bit_error_rate=None):
+    def transmit_traffic(self, duration, time, bandwidth=256, bit_error_rate=None):
         # The bandwidth is per time unite not s
         available_bandwidth = duration*bandwidth
+        tp = 0
         for packet in self.queue:
             if packet.size > available_bandwidth:
                 break
             self.queue.remove(packet)
-            # print(f' one packet sent, packet size: {self.qsize}')
             available_bandwidth -= packet.size
+            tp += 1
+            # print(f' At {time}, # {tp} packet sent, packet size: {self.qsize}')
         self.wasted_bandwidth += available_bandwidth/self.packet_size
         # print(f'{available_bandwidth} of channel wasted!')
