@@ -4,6 +4,10 @@ register(
     id='ServicePeriodAllocation-v0',
     entry_point='scheduler.envs:ServicePeriodAllocationV0',
 )
+register(
+    id='ServicePeriodAllocation-v1',
+    entry_point='scheduler.envs:ServicePeriodAllocationV1',
+)
 
 register(
     id='CommsRLTimeFreqResourceAllocation-v0',
