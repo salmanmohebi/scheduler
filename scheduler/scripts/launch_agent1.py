@@ -4,8 +4,8 @@ import random
 
 from scheduler.agents.simple_agent import SimpleAgent
 
-n_eps = 10
-t_max = 1000
+n_eps = 1
+t_max = 10
 alpha = 0.1
 gamma = 0.6
 epsilon = 0.1
