@@ -20,10 +20,11 @@ class ServicePeriodAllocationV1(Env):
         self.pkt_generation_period = 10
         self.number_of_pkts = 4
         self.pkt_size = 256
-        self.buffer_size = 0
+        self.delay_bound = 30
         self.max_buffer_size = 99
+        self.buffer = list()
 
-        self.dropped_pkts = self.wasted_time = 0
+        self.dropped_pkts = self.wasted_time = self.outdated_pkts = 0
 
         self.states_number = self.max_buffer_size + 1
         self.action_space = spaces.Discrete(4)
@@ -34,7 +35,7 @@ class ServicePeriodAllocationV1(Env):
         print(f'duration: {self.alc_duration}, period: {self.alc_period}')
         self._generate_traffic()
         self.dropped_pkts = self.wasted_time = 0
-        return self.buffer_size
+        return np.array([self.buffer_size, self.buffer[0].age if self.buffer_size > 0 else 0])
 
     def step(self, action):
         if action == 0:
@@ -72,13 +73,23 @@ class ServicePeriodAllocationV1(Env):
         print(f'duration: {self.alc_duration}, period: {self.alc_period}, reward: {reward} = {self.wasted_time}w + {self.dropped_pkts}d')
         self.dropped_pkts = self.wasted_time = 0
 
-        return self.buffer_size, reward, self.t >= self.t_max, {}
+        state = np.array([self.buffer_size, self.buffer[0].age if self.buffer_size > 0 else 0])
+
+        return state, reward, self.t >= self.t_max, {}
 
     def render(self, mode='human'):
         pass
 
     def _calculate_reward(self):
         return -(self.wasted_time + self.dropped_pkts)
+
+    @property
+    def buffer_size(self):
+        return len(self.buffer)
+
+    @property
+    def now(self):
+        return self.env.now
 
     def _generate_traffic(self):
         """"Generate periodic traffics
@@ -89,12 +100,13 @@ class ServicePeriodAllocationV1(Env):
         """
 
         while True:
+            self._remove_outdated()
             pkts = min(self.number_of_pkts, self.max_buffer_size - self.buffer_size)
-            self.buffer_size += pkts
+            self.buffer.extend([Packet(self.now) for _ in range(pkts)])
             dropped_pkts = self.number_of_pkts - pkts
             self.dropped_pkts += dropped_pkts
             if self.verbose:
-                print(f'In {float(self.env.now)}, {pkts} added to buffer and {dropped_pkts}({self.dropped_pkts}) dropped, size: {self.buffer_size}')
+                print(f'In {float(self.now)}, {pkts} added to buffer and {dropped_pkts}({self.dropped_pkts}) dropped, size: {self.buffer_size}')
             yield self.env.timeout(self.pkt_generation_period)
 
     def _transmit_traffic(self, duration, bandwidth=256):
@@ -105,18 +117,46 @@ class ServicePeriodAllocationV1(Env):
         :param duration: Transmission time in each period
         :param bandwidth: Available bandwidth per time unit
         """
+
         while True:
             available_bandwidth = duration * bandwidth
             while available_bandwidth > self.pkt_size:
                 available_bandwidth -= self.pkt_size
+                self._remove_outdated()
                 packet_time = self.pkt_size / bandwidth
                 if self.buffer_size > 0:
-                    self.buffer_size -= 1
+                    self.buffer.pop()
+                    # self.buffer_size -= 1
                     if self.verbose:
-                        print(f'In {float(self.env.now)}, 1 packet transmitted, size: {self.buffer_size}')
+                        print(f'In {float(self.now)}, 1 packet transmitted, size: {self.buffer_size}')
                 else:
                     self.wasted_time += packet_time
                     if self.verbose:
-                        print(f'In {float(self.env.now)}, {float(packet_time)} of time wasted, total: {self.wasted_time}')
+                        print(f'In {float(self.now)}, {float(packet_time)} of time wasted, total: {self.wasted_time}')
                 yield self.env.timeout(packet_time)
             yield self.env.timeout(self.alc_period - duration)
+
+    def _remove_outdated(self):
+        """Check and remove the outdated packets from the buffer
+        This function should be called before generating new packets and transmit packets
+        to remove outdated packets
+        """
+
+        size = self.buffer_size
+        self.buffer = [packet for packet in self.buffer if packet.age(self.now) <= self.delay_bound]
+        self.outdated_pkts += size - self.buffer_size
+        if self.verbose and size - self.buffer_size > 0:
+            print(f'In {float(self.now)}, {size - self.buffer_size} outdated packets removed, the buffer size: {self.buffer_size}')
+
+
+class Packet:
+    """The packet class,
+    A class for packets is more flexible than adding multiple list for traffic
+    """
+    
+    def __init__(self, generated_time, size=256):
+        self.time = generated_time
+        self.size = size
+
+    def age(self, now):
+        return now - self.time
