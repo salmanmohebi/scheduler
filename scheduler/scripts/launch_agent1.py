@@ -5,7 +5,7 @@ import random
 from scheduler.agents.simple_agent import SimpleAgent
 
 n_eps = 1
-t_max = 10
+t_max = 100
 alpha = 0.1
 gamma = 0.6
 epsilon = 0.1
@@ -21,7 +21,7 @@ for ep in range(n_eps):
             action = env.action_space.sample()
         else:
             action = np.argmax(q_table[state])
-        # print(f'{state} --- {action}')
+        print(f'{state} --- {action}')
         next_state, reward, done, _ = env.step(action)
 
         q_value = q_table[state, action]

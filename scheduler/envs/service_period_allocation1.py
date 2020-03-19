@@ -14,7 +14,7 @@ class ServicePeriodAllocationV1(Env):
         self.t_max = t_max
         self.t = 0
 
-        self.verbose = True  # enable logging
+        self.verbose = False  # enable logging
 
         # traffic specification
         self.pkt_generation_period = 10
@@ -69,7 +69,7 @@ class ServicePeriodAllocationV1(Env):
 
         self.t += 1
         reward = self._calculate_reward()
-        print(f'duration: {self.alc_duration}, period: {self.alc_period}, reward: {reward} = {self.wasted_time}w + {self.dropped_pkts}d')
+        print(f'duration: {self.alc_duration}, period: {self.alc_period}, buffer:{self.buffer_size} ,reward: {reward} = {self.wasted_time}w + {self.dropped_pkts}d')
         self.dropped_pkts = self.wasted_time = 0
 
         return self.buffer_size, reward, self.t >= self.t_max, {}
@@ -105,6 +105,7 @@ class ServicePeriodAllocationV1(Env):
         :param duration: Transmission time in each period
         :param bandwidth: Available bandwidth per time unit
         """
+
         while True:
             available_bandwidth = duration * bandwidth
             while available_bandwidth > self.pkt_size:
