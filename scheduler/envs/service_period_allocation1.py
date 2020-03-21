@@ -14,28 +14,30 @@ class ServicePeriodAllocationV1(Env):
         self.t_max = t_max
         self.t = 0
 
-        self.verbose = True  # enable logging
+        self.verbose = False  # enable logging
 
         # traffic specification
         self.pkt_generation_period = 10
         self.number_of_pkts = 4
         self.pkt_size = 256
         self.delay_bound = 30
-        self.max_buffer_size = 99
+        self.max_buffer_size = 100
         self.buffer = list()
 
         self.dropped_pkts = self.wasted_time = self.outdated_pkts = 0
 
-        self.states_number = self.max_buffer_size + 1
+        self.state = None
+        self.states_number = (self.max_buffer_size + 1) * (self.delay_bound + 1)
         self.action_space = spaces.Discrete(4)
 
     def reset(self):
         self.alc_duration = np.random.randint(1, self.dti_duration//2)
         self.alc_period = np.random.randint(self.alc_duration, self.dti_duration - self.alc_duration)
-        print(f'duration: {self.alc_duration}, period: {self.alc_period}')
+        # print(f'duration: {self.alc_duration}, period: {self.alc_period}')
         self._generate_traffic()
-        self.dropped_pkts = self.wasted_time = 0
-        return np.array([self.buffer_size, self.buffer[0].age if self.buffer_size > 0 else 0])
+        self.dropped_pkts = self.wasted_time = self.outdated_pkts = 0
+        self._update_state()
+        return self.state
 
     def step(self, action):
         if action == 0:
@@ -60,28 +62,38 @@ class ServicePeriodAllocationV1(Env):
         if self.alc_period < self.alc_duration:
             self.alc_period = self.alc_duration
 
-        self.dropped_pkts = self.wasted_time = 0
+        if self.alc_duration == self.alc_period:
+            self.alc_duration = self.alc_period = self.dti_duration
+        self.dropped_pkts = self.wasted_time = self.outdated_pkts = 0
 
         # Periodically generate and transmit traffic
-        self.env = simpy.Environment()
+        self.env = simpy.Environment(initial_time=self.t*self.dti_duration)
         self.env.process(self._generate_traffic())  # generate traffics
         self.env.process(self._transmit_traffic(self.alc_duration))  # transmit traffic
-        self.env.run(until=self.dti_duration)
-
+        self.env.run(until=self.now + self.dti_duration)
         self.t += 1
         reward = self._calculate_reward()
-        print(f'duration: {self.alc_duration}, period: {self.alc_period}, reward: {reward} = {self.wasted_time}w + {self.dropped_pkts}d')
+        print(
+            f'duration: {self.alc_duration}, period: {self.alc_period}, '
+            f'reward: {reward} = {self.wasted_time} (w) + {self.dropped_pkts} (d) + {self.outdated_pkts} (o)'
+        )
         self.dropped_pkts = self.wasted_time = 0
 
-        state = np.array([self.buffer_size, self.buffer[0].age if self.buffer_size > 0 else 0])
-
-        return state, reward, self.t >= self.t_max, {}
+        self._update_state()
+        return self.state, reward, self.t >= self.t_max, {}
 
     def render(self, mode='human'):
         pass
 
     def _calculate_reward(self):
-        return -(self.wasted_time + self.dropped_pkts)
+        return -(self.wasted_time + self.dropped_pkts + self.outdated_pkts)
+
+    def _update_state(self):
+        self.state = int(self.buffer_size * self.delay_bound + self.oldest_packet)
+
+    @property
+    def oldest_packet(self):
+        return self.buffer[0].age(self.now) if self.buffer_size > 0 else 0
 
     @property
     def buffer_size(self):
@@ -120,13 +132,12 @@ class ServicePeriodAllocationV1(Env):
 
         while True:
             available_bandwidth = duration * bandwidth
-            while available_bandwidth > self.pkt_size:
+            while available_bandwidth >= self.pkt_size:
                 available_bandwidth -= self.pkt_size
                 self._remove_outdated()
                 packet_time = self.pkt_size / bandwidth
                 if self.buffer_size > 0:
                     self.buffer.pop()
-                    # self.buffer_size -= 1
                     if self.verbose:
                         print(f'In {float(self.now)}, 1 packet transmitted, size: {self.buffer_size}')
                 else:
@@ -135,6 +146,7 @@ class ServicePeriodAllocationV1(Env):
                         print(f'In {float(self.now)}, {float(packet_time)} of time wasted, total: {self.wasted_time}')
                 yield self.env.timeout(packet_time)
             yield self.env.timeout(self.alc_period - duration)
+            assert self.alc_period != duration
 
     def _remove_outdated(self):
         """Check and remove the outdated packets from the buffer

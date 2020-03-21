@@ -4,8 +4,8 @@ import random
 
 from scheduler.agents.simple_agent import SimpleAgent
 
-n_eps = 1
-t_max = 10
+n_eps = 1000
+t_max = 100
 alpha = 0.1
 gamma = 0.6
 epsilon = 0.1
@@ -13,6 +13,7 @@ epsilon = 0.1
 env = gym.make('ServicePeriodAllocation-v1')
 q_table = np.zeros((env.states_number, env.action_space.n))
 
+print('lets go...')
 for ep in range(n_eps):
     reward = 0
     state = env.reset()
@@ -21,7 +22,6 @@ for ep in range(n_eps):
             action = env.action_space.sample()
         else:
             action = np.argmax(q_table[state])
-        # print(f'{state} --- {action}')
         next_state, reward, done, _ = env.step(action)
 
         q_value = q_table[state, action]
