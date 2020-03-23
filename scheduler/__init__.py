@@ -13,3 +13,8 @@ register(
     id='CommsRLTimeFreqResourceAllocation-v0',
     entry_point='scheduler.envs:CommsRLTimeFreqResourceAllocationV0',
 )
+
+register(
+    id='DtiAllocation-v0',
+    entry_point='scheduler.envs:DtiAllocationV0',
+)

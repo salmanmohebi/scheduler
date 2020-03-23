@@ -1,2 +1,3 @@
 from scheduler.envs.service_period_allocation import ServicePeriodAllocationV0
 from scheduler.envs.service_period_allocation1 import ServicePeriodAllocationV1
+from scheduler.envs.dti_scheduler import DtiAllocationV0
