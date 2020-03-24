@@ -10,18 +10,19 @@ class DtiAllocationV0(Env):
     def __init__(self):
         self.env = None
         self.number_of_stations = 7
-        self.pkt_size = 1472
+        self.packet_size = 1472
         self.max_q_size = 5000
-        self.mcs_throughput = 3465
+        self.mcs_throughput = 3465  # channel throughput (MCS12)
         self.bi_duration = 0.041984
-        self.possible_data_rate = np.array([50, 100, 150, 200, 600], dtype=np.float64)
+        self.possible_data_rate = np.array([50, 100, 150, 200, 600], dtype=np.float64)  # MBps
         self.stations_data_rate = np.array(
             [np.random.choice(self.possible_data_rate) * 10 ** 6 for _ in range(self.number_of_stations)]
         )  # data rate for each station
 
         # min required SP for each station
-        self.min_sp = (self.stations_data_rate / self.mcs_throughput) * self.bi_duration * 10 ** 6
-        self.pkt_generation_period = (self.pkt_size/self.stations_data_rate) * 10 ** 6
+        self.min_sp = (self.stations_data_rate / self.mcs_throughput) * self.bi_duration
+        self.packets_per_period = 100 * np.ones((self.number_of_stations,))
+        self.pkt_generation_period = (self.packets_per_period * self.packet_size/self.stations_data_rate) * 10 ** 6
         self.verbose = False
         self.dropped_pkts = self.wasted_time = self.outdated_pkts = 0
         self.t = 0
@@ -66,8 +67,9 @@ class DtiAllocationV0(Env):
 
     def _generate_traffic(self, idx):
         while True:
-            if self.queue_size[idx] < self.max_q_size - 1:
-                self.queue_size[idx] += 1
+            new_packets = min(self.packets_per_period[idx], self.max_q_size - self.queue_size[idx])
+            if self.queue_size[idx] < self.max_q_size - new_packets - 1:
+                self.queue_size[idx] += new_packets
                 if self.verbose:
                     print(f'TIME: {self.now}: station {idx} , new packet , queue size: {self.queue_size[idx]}')
             else:
@@ -79,9 +81,9 @@ class DtiAllocationV0(Env):
         yield self.env.timeout(start)
         print(f'TIME: {self.now}: station {idx}, SP start')
         available_bandwidth = self.mcs_throughput * duration
-        while available_bandwidth >= self.pkt_size:
-            available_bandwidth -= self.pkt_size
-            packet_time = self.pkt_size / self.mcs_throughput
+        while available_bandwidth >= self.packet_size:
+            available_bandwidth -= self.packet_size
+            packet_time = self.packet_size / self.mcs_throughput
             if self.queue_size[idx] > 0:
                 self.queue_size[idx] -= 1
                 if self.verbose:
