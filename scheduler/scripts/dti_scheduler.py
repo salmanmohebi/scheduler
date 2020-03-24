@@ -5,7 +5,7 @@ import random
 from scheduler.agents.simple_agent import SimpleAgent
 
 n_eps = 1
-t_max = 100
+t_max = 10
 alpha = 0.1
 gamma = 0.6
 epsilon = 0.1
@@ -25,7 +25,7 @@ for ep in range(n_eps):
                 action[st] = np.argmax(q_table[st, int(state[st]), :])
             next_state, reward, done, _ = env.step(action)
 
-            print(f'{q_table.shape}, {st}, {state[st]}, {action[st]}')
+            # print(f'{q_table.shape}, {st}, {state[st]}, {action[st]}')
             q_value = q_table[st, int(state[st]), int(action[st])]
             max_value = np.max(q_table[st, int(next_state[st])])
             new_q_value = (1 - alpha) * q_value + alpha * (reward + gamma * max_value)

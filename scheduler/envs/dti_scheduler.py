@@ -47,12 +47,10 @@ class DtiAllocationV0(Env):
 
         #  schedule the SP for stations in queues based on FCFS
         for idx in range(self.number_of_stations):
-            print(f'Before transmit {idx}, length of queue is: {self.queue_size[idx]}')
             self.env.process(self._transmit_traffic(idx, self.sp_start[idx], self.sp_duration[idx]))
 
         # Initialize the packet generation functions for stations
         for idx in range(self.number_of_stations):
-            print(f'Before generate {idx}, length of queue is: {len(self.queue_size)}')
             self.env.process(self._generate_traffic(idx))
 
         self.env.run(until=self.now + self.bi_duration)  # Run for one episode
@@ -72,6 +70,7 @@ class DtiAllocationV0(Env):
         :param idx: station Id
         :return:
         """
+
         while True:
             new_packets = min(self.batch_size[idx], self.max_q_size - self.queue_size[idx])
             if self.queue_size[idx] < self.max_q_size - new_packets - 1:
@@ -91,7 +90,9 @@ class DtiAllocationV0(Env):
         :param duration: SP duration
         :return:
         """
+        print(f'TIME: {self.now}: station {idx} , scheduled in {start} for {duration} seconds')
         yield self.env.timeout(start)
+        print(f'TIME: {self.now}: station {idx} , started SP')
         available_bandwidth = self.mcs_throughput * duration
         while available_bandwidth >= self.packet_size:
             available_bandwidth -= self.packet_size
