@@ -21,7 +21,8 @@ class DtiAllocationV0(Env):
         # min required SP for each station
         self.min_sp = (self.stations_data_rate * 8 / self.mcs_throughput) * self.bi_duration  # Seconds
         self.pkt_generation_period = (self.batch_size * self.packet_size/(self.stations_data_rate * 10 ** 6))  # Seconds
-        self.dropped_pkts = self.wasted_time = self.outdated_pkts = 0  # Record some statistics for future uses
+        # Record some statistics for future uses
+        self.dropped_pkts, self.wasted_time, self.outdated_pkts, self.successful_transmission = np.zeros((4, self.number_of_stations))
         self.t = 0  # count the steps
         self.verbose = False  # print logging
 
@@ -29,12 +30,12 @@ class DtiAllocationV0(Env):
         self.sp_duration = self.min_sp
         self.sp_start = None
 
-        # TODO: action and observation spaces anre not continues, can use spaces.discrete()
+        # TODO: action and observation spaces are not continues, can use spaces.discrete()
         self.action_space = spaces.Box(low=0, high=self.number_of_actions, shape=(self.number_of_stations,), dtype=int)
         self.observation_space = spaces.Box(low=0, high=self.max_q_size, shape=(self.number_of_stations,), dtype=int)
 
     def reset(self):
-        self.dropped_pkts = self.wasted_time = self.outdated_pkts = 0
+        self.dropped_pkts, self.wasted_time, self.outdated_pkts, self.successful_transmission = np.zeros((4, self.number_of_stations))
         self.queue_size = np.zeros(self.number_of_stations)
         return self.queue_size
 
@@ -55,6 +56,7 @@ class DtiAllocationV0(Env):
 
         self.env.run(until=self.now + self.bi_duration)  # Run for one episode
         self.t += 1
+        print(self.dropped_pkts, self.wasted_time, self.successful_transmission, self.outdated_pkts)
         return self.queue_size, self._calculate_rewards(), False, {}
 
     def render(self, mode='human', close=False):
@@ -72,13 +74,12 @@ class DtiAllocationV0(Env):
         """
 
         while True:
-            new_packets = min(self.batch_size[idx], self.max_q_size - self.queue_size[idx])
-            if self.queue_size[idx] < self.max_q_size - new_packets - 1:
-                self.queue_size[idx] += new_packets
-                if self.verbose:
-                    print(f'TIME: {self.now}: station {idx} , new packet , queue size: {self.queue_size[idx]}')
-            else:
-                self.dropped_pkts += self.batch_size - new_packets
+            new_packets = min(self.batch_size[idx], self.max_q_size - self.queue_size[idx] - 1)
+            self.queue_size[idx] += new_packets
+            if self.verbose:
+                print(f'TIME: {self.now}: station {idx} , new packet , queue size: {self.queue_size[idx]}')
+            self.dropped_pkts[idx] += self.batch_size[idx] - new_packets
+            assert self.queue_size[idx] < self.max_q_size
             assert self.pkt_generation_period[idx] > 0
             yield self.env.timeout(self.pkt_generation_period[idx])
 
@@ -92,21 +93,23 @@ class DtiAllocationV0(Env):
         """
         print(f'TIME: {self.now}: station {idx} , scheduled in {start} for {duration} seconds')
         yield self.env.timeout(start)
-        print(f'TIME: {self.now}: station {idx} , started SP')
-        available_bandwidth = self.mcs_throughput * duration
-        while available_bandwidth >= self.packet_size:
-            available_bandwidth -= self.packet_size
-            packet_time = self.packet_size / self.mcs_throughput
+        print(f'TIME: {self.now}: station {idx} , start SP')
+        available_bandwidth = duration * self.mcs_throughput * 10 ** 6
+        packet_size_bit = self.packet_size * 8
+        while available_bandwidth >= packet_size_bit:
+            available_bandwidth -= packet_size_bit
+            packet_trasmit_time = packet_size_bit / self.mcs_throughput * 10 ** 6
             if self.queue_size[idx] > 0:
                 self.queue_size[idx] -= 1
+                self.successful_transmission[idx] += 1
                 if self.verbose:
                     print(f'TIME: {self.now}: station {idx}, packet transmitted, size: {self.queue_size[idx]}')
             else:
-                self.wasted_time += 1
+                self.wasted_time[idx] += 1
                 if self.verbose:
                     print(f'TIME: {self.now}: station {idx}, time wasted, total: {self.wasted_time}')
-            assert packet_time > 0
-            yield self.env.timeout(packet_time)
+            assert packet_trasmit_time > 0
+            yield self.env.timeout(packet_trasmit_time)
 
     def _remove_outdated(self, delay_bound):  # TODO: this function doesn't used for now
         """Check and remove the outdated packets from the buffer
