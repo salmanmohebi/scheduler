@@ -1,4 +1,4 @@
-from scheduler.envs.service_period_allocation import ConstantBitRateTraffic
+from old.scheduler.envs.service_period_allocation import ConstantBitRateTraffic
 
 
 cbr = ConstantBitRateTraffic(

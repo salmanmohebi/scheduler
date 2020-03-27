@@ -2,8 +2,6 @@ import gym
 import numpy as np
 import random
 
-from scheduler.agents.simple_agent import SimpleAgent
-
 n_eps = 10
 t_max = 100
 alpha = 0.1
