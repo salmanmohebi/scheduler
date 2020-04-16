@@ -1,5 +1,8 @@
 # scheduler
-This a simple discrete-event simulator (DES) for the channel allocation in 802.11ad based on OpenAI Gym and Simpy.
+A very simple discrete-event simulator (DES) for channel allocation in 802.11ad based on Simpy.
+
+We are providing an environment for the OpenAI Gym frame work.
+Later on we are going to write some Agents to interact with this environment. 
 
 Setup Python environment
 ```

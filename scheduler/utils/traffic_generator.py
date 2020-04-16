@@ -1,7 +1,7 @@
 """
 Some ideas come from: https://www.grotto-networking.com/DiscreteEventPython.html
 """
-from simpy import Environment
+from simpy import Environment, Store
 
 
 class Packet:
@@ -48,7 +48,7 @@ class TrafficGenerator:
     """
 
     def __init__(self, env: Environment, tid: int = 0, src='src', dst: str = 'dst', adist=lambda: 10,
-                 sdist=lambda: 256, out=None, start: float = 0, end: float = float('inf')):
+                 sdist=lambda: 2**8, out=None, start: float = 0, end: float = float('inf')):
         self.env = env
         self.tid = tid
         self.src, self.dst = src, dst
@@ -77,70 +77,74 @@ class TrafficGenerator:
             yield self.env.timeout(self.adist())
 
 
-class Mac:
-    """ Create a class to store the generated packets
+class Server:
+    """ Create the Server class to store the generated packets in the buffer
+    and transmit them over the channel
 
     Args:
-        max_size (int): maximum size of buffer in bytes
+        env (simpy.Environment): simulation environment
+        name (str): name or id of the server
+        q_unit (str): queue size unit which can be either in packets or bytes
+        max_qsize (int): maximum size of queue
+        bandwidth (float): the bandwidth of channel to transmit
+        out: the channel class with a put methods
+
+    Return:
+        traffic streams, that transmitted over the channel
     """
 
-    def __init__(self, env: Environment, bandwidth: float = None, qlength: int = True,
-                 qsize: bool = False, max_size: int = 5000, out=None):
+    def __init__(self, env: Environment, name: str = 'server', q_unit: str = 'packets',
+                 max_qsize: int = 5000, bandwidth: float = None, out=None):
+
+        if q_unit not in ['packets', 'bytes']:
+            raise ValueError('q_size_uint must be either `packets` or `bytes`')
 
         self.env = env
-        self.bandwidth = bandwidth
-        self.qlength = qlength
-        self.qsize = qsize
-        self.max_size = self.free = max_size
-        self.buffer = simpy.Store(env, capacity=max_size)
-        self.out = out
+        self.name = name
+        self.max_size = self.free = max_qsize
+        self.q_unit = q_unit
+        self.queue = Store(env, capacity=max_qsize)
         self.dropped_count = self.dropped_size = 0
-        self.env.process(self.transmit())
+        self.bandwidth = bandwidth
+        self.out = out
+        self.env.process(self.send())
 
-    def transmit(self):
+    def send(self):
+        """ Transmit the packets over the channel using the channels put function """
         while True:
-            pkt = yield self.buffer.get()
+            pkt = yield self.queue.get()
             self.free += pkt.size
             yield self.env.timeout(pkt.size * 8 / self.bandwidth)
             self.out.put(pkt)
 
     def put(self, pkt):
-        if self.qsize and self.free >= pkt.size:
+        """ Store the received traffic from the higher layer in the buffer """
+        if self.q_unit == 'bytes' and self.free >= pkt.size:
             self.free -= pkt.size
-            return self.buffer.put(pkt)
-        elif self.qlength and self.free > 0:
+            return self.queue.put(pkt)
+        elif self.q_unit == 'packets' and self.free > 0:
             self.free -= 1
-            return self.buffer.put(pkt)
+            return self.queue.put(pkt)
         else:
             self.dropped_count += 1
             self.dropped_size += pkt.size
             return
 
 
-class Mac2:
-    def __init__(self, env):
+class Client:
+    """ Client class which receives the traffics from channel
+     and can applied some analysis on like as calculating
+     the average delay
+
+     Args:
+        env (simpy.Environment): simulation environment
+        name (str): name or id of the server
+     """
+
+    def __init__(self, env: Environment, name: str = 'receiver'):
         self.env = env
+        self.name = name
 
     def put(self, pkt):
+        """ Receives traffics from the channel """
         print(f'{pkt}, received at {self.env.now}')
-
-
-def func(n):
-    while True:
-        for _ in range(n):
-            yield 0
-        yield 1
-
-
-if __name__ == '__main__':
-    import simpy
-    env = simpy.Environment()
-    mac = Mac(env, bandwidth=2**10, out=Mac2(env))
-    adist = func(1)
-    tr = TrafficGenerator(env, adist=lambda: 1, out=mac)
-
-    env.run(2**7)
-    print(mac.free, mac.max_size, mac.dropped_size, mac.dropped_count)
-
-
-
