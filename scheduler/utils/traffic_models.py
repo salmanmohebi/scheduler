@@ -7,13 +7,13 @@ def cbr_traffic(const: float):
 
 def bursty_traffic(batch_size: int, period: float):
     while True:
-        for _ in range(batch_size):
+        for _ in range(1, batch_size):
             yield 0
         yield period
 
 
 def poisson_traffic(lam: float, size: int = 1):
-    return np.random.poisson(lam, size)
+    return float(np.random.poisson(lam, size))
 
 
 def gaussian_traffic(mu: float, sigma: float, size: int = 1):

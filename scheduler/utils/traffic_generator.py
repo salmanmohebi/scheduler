@@ -27,8 +27,9 @@ class Packet:
         self.dst = dst
 
     def __str__(self):
-        return f'Packet: no. {self.seq_no}, time: {self.time}, ' \
-               f'size: {self.size}, src: {self.src}, dst: {self.dst}'
+        # return f'Packet: {self.seq_no}'
+        return f'Packet: {{no. {self.seq_no}, time: {self.time}, ' \
+               f'size: {self.size}, src: {self.src}, dst: {self.dst}}}'
 
 
 class TrafficGenerator:
@@ -68,7 +69,7 @@ class TrafficGenerator:
                 time=self.env.now, size=self.sdist(),
                 seq_no=self.seq_no, src=self.src, dst=self.dst
             )
-            print(f'{packet} generated at {self.env.now}')
+            # print(f'{packet}, generated at {self.env.now}')
 
             self.seq_no = (self.seq_no + 1) % 2**10
             assert self.out
@@ -106,16 +107,45 @@ class Server:
         self.queue = Store(env, capacity=max_qsize)
         self.dropped_count = self.dropped_size = 0
         self.bandwidth = bandwidth
+
+        # allocation parameters
+        self.dti_duration = 100
+        self.start = 0
+        self.duration = self.dti_duration
+        self.period = self.dti_duration + 1
         self.out = out
         self.env.process(self.send())
 
     def send(self):
         """ Transmit the packets over the channel using the channels put function """
+
         while True:
-            pkt = yield self.queue.get()
-            self.free += pkt.size
-            yield self.env.timeout(pkt.size * 8 / self.bandwidth)
-            self.out.put(pkt)
+            dti_end = self.env.now + self.dti_duration
+
+            # wait until starting time
+            assert self.start >= 0
+            yield self.env.timeout(self.start)
+            while self.env.now < dti_end:
+
+                s_time = self.env.now
+                while self.env.now - s_time < self.duration:
+
+                    pkt = yield self.queue.get()
+                    self.free += pkt.size
+
+                    print(f'{pkt}, send at {self.env.now}')
+                    # wait until the current packet transmitted
+                    assert pkt.size * 8 / self.bandwidth > 0
+                    yield self.env.timeout(pkt.size * 8 / self.bandwidth)
+                    self.out.put(pkt)
+
+                if self.env.now + self.period <= dti_end:
+                    # wait for next period
+                    assert self.period - self.duration > 0
+                    yield self.env.timeout(self.period - self.duration)
+                else:
+                    # wait until the end of dti after last period
+                    yield self.env.timeout(dti_end - self.env.now)
 
     def put(self, pkt):
         """ Store the received traffic from the higher layer in the buffer """
@@ -147,4 +177,4 @@ class Client:
 
     def put(self, pkt):
         """ Receives traffics from the channel """
-        print(f'{pkt}, received at {self.env.now}')
+        # print(f'{pkt}, received at {self.env.now}')
