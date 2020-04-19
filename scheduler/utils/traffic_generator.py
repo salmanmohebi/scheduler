@@ -106,6 +106,9 @@ class Server:
         self.q_unit = q_unit
         self.queue = Store(env, capacity=max_qsize)
         self.dropped_count = self.dropped_size = 0
+        self.transmitted_count = self.transmitted_size = 0
+        self.transmission_time = 0
+        self.total_allocation_time = 0
         self.bandwidth = bandwidth
 
         # allocation parameters
@@ -126,6 +129,7 @@ class Server:
             assert self.start >= 0
             yield self.env.timeout(self.start)
             while self.env.now < dti_end:
+                self.total_allocation_time += min(self.duration, dti_end - self.env.now)
 
                 s_time = self.env.now
                 while self.env.now - s_time < self.duration:
@@ -135,11 +139,15 @@ class Server:
 
                     print(f'{pkt}, send at {self.env.now}')
                     # wait until the current packet transmitted
-                    assert pkt.size * 8 / self.bandwidth > 0
-                    yield self.env.timeout(pkt.size * 8 / self.bandwidth)
+                    transmission_time = pkt.size * 8 / self.bandwidth
+                    self.transmission_time += transmission_time
+                    assert transmission_time > 0
+                    yield self.env.timeout(transmission_time)
                     self.out.put(pkt)
+                    self.transmitted_count += 1
+                    self.transmitted_size += pkt.size
 
-                if self.env.now + self.period <= dti_end:
+                if self.env.now + self.duration <= dti_end:
                     # wait for next period
                     assert self.period - self.duration > 0
                     yield self.env.timeout(self.period - self.duration)

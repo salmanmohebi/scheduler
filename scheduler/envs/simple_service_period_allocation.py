@@ -21,9 +21,9 @@ class SimpleServicePeriodAllocationV0(Env):
 
     def step(self, action):
         dti_duration = 50
-        self.stations[0].start = 5
-        self.stations[0].duration = 3
-        self.stations[0].period = 10
+        self.stations[0].start = 0
+        self.stations[0].duration = 10
+        self.stations[0].period = 15
         self.stations[0].dti_duration = dti_duration
         # self.stations[1].start = 5
         # self.stations[1].duration = 5
@@ -33,12 +33,15 @@ class SimpleServicePeriodAllocationV0(Env):
         # self.stations[2].period = 10
 
         self.env.run(until=dti_duration)
+        print(self.stations[0].total_allocation_time)
         print('-----------------------')
+        self.stations[0].total_allocation_time = 0
         self.stations[0].start = 0
-        self.stations[0].duration = 5
+        self.stations[0].duration = 4
         self.stations[0].period = 15
         self.stations[0].dti_duration = dti_duration
         self.env.run(until=2*dti_duration)
+        print(self.stations[0].total_allocation_time)
         print('hi')
 
     def seed(self, seed=None):
@@ -57,7 +60,7 @@ class SimpleServicePeriodAllocationV0(Env):
 
         # tr1 = TrafficGenerator(self.env, src='srv1', adist=lambda: 10,
         #                        sdist=lambda: 2**8, out=srv1)
-        bt = bursty_traffic(5, 10)
+        bt = bursty_traffic(20, 10)
         tr2 = TrafficGenerator(self.env, src='srv2', adist=lambda: next(bt),
                                sdist=lambda: 2**8, out=srv2)
         # tr3 = TrafficGenerator(self.env, src='srv3', adist=lambda: poisson_traffic(15),
